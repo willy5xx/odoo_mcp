@@ -1,0 +1,17 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "odoo-mcp"
+version = "0.1.0"
+description = "MCP server for Odoo project management — turn PRDs into actionable Odoo tasks from Cursor"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+dependencies = [
+    "mcp[cli]>=1.0.0",
+]
+
+[project.scripts]
+odoo-mcp = "odoo_mcp.server:main"

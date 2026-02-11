@@ -4,7 +4,7 @@
       "command": "odoo-mcp",
       "env": {
         "ODOO_URL": "https://mycompany.odoo.com",
-        "ODOO_DB": "mycompany-main",
+        "ODOO_DB": "mycompany",
         "ODOO_USERNAME": "admin@mycompany.com",
         "ODOO_API_KEY": "your-api-key-here"
       }

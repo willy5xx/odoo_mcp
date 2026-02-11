@@ -42,6 +42,7 @@ class OdooClient:
             f"{self.url}/xmlrpc/2/object", allow_none=True
         )
         self._uid: int | None = None
+        self._model_fields_cache: dict[str, set[str]] = {}
 
     # ── Authentication ──────────────────────────────────────────────
 
@@ -123,6 +124,25 @@ class OdooClient:
             kw["fields"] = fields
         return self.execute(model, "read", [record_ids], kw)
 
+    def get_model_fields(self, model: str) -> set[str]:
+        """Return available field names for a model (cached)."""
+        cached = self._model_fields_cache.get(model)
+        if cached is not None:
+            return cached
+        fields_meta = self.execute(model, "fields_get", [], {})
+        field_names = set(fields_meta.keys())
+        self._model_fields_cache[model] = field_names
+        return field_names
+
+    def _task_hours_field(self) -> str | None:
+        """Return the preferred task estimate field for this Odoo instance."""
+        fields = self.get_model_fields("project.task")
+        if "planned_hours" in fields:
+            return "planned_hours"
+        if "allocated_hours" in fields:
+            return "allocated_hours"
+        return None
+
     # ── Project helpers ─────────────────────────────────────────────
 
     def list_projects(self, active_only: bool = True) -> list[dict]:
@@ -173,7 +193,9 @@ class OdooClient:
         if parent_id:
             vals["parent_id"] = parent_id
         if planned_hours is not None:
-            vals["planned_hours"] = planned_hours
+            hours_field = self._task_hours_field()
+            if hours_field:
+                vals[hours_field] = planned_hours
         if tag_ids:
             vals["tag_ids"] = [(6, 0, tag_ids)]
         if user_ids:
@@ -190,28 +212,57 @@ class OdooClient:
         domain: list = [["project_id", "=", project_id]]
         if stage_id:
             domain.append(["stage_id", "=", stage_id])
+        task_fields = self.get_model_fields("project.task")
+        fields = [
+            "id",
+            "name",
+            "stage_id",
+            "priority",
+            "user_ids",
+            "tag_ids",
+            "parent_id",
+            "child_ids",
+            "date_deadline",
+        ]
+        hours_field = self._task_hours_field()
+        if hours_field:
+            fields.append(hours_field)
+
         return self.search_read(
             "project.task",
             domain=domain,
-            fields=[
-                "id",
-                "name",
-                "stage_id",
-                "priority",
-                "user_ids",
-                "tag_ids",
-                "parent_id",
-                "child_ids",
-                "planned_hours",
-                "date_deadline",
-            ],
+            fields=[f for f in fields if f in task_fields],
             limit=limit,
             order="sequence asc, id asc",
         )
 
     def update_task(self, task_id: int, values: dict) -> bool:
         """Update a task by ID."""
+        if "planned_hours" in values:
+            hours_value = values.pop("planned_hours")
+            hours_field = self._task_hours_field()
+            if hours_field:
+                values[hours_field] = hours_value
         return self.write("project.task", [task_id], values)
+
+    def post_task_message(
+        self,
+        task_id: int,
+        body: str,
+        message_type: str = "comment",
+        subtype_xmlid: str = "mail.mt_comment",
+    ) -> int:
+        """Post a chatter message on a task and return message ID."""
+        return self.execute(
+            "project.task",
+            "message_post",
+            [[task_id]],
+            {
+                "body": body,
+                "message_type": message_type,
+                "subtype_xmlid": subtype_xmlid,
+            },
+        )
 
     # ── Tag helpers ─────────────────────────────────────────────────
 
@@ -257,3 +308,13 @@ class OdooClient:
             limit=limit,
             order="name asc",
         )
+
+    # ── Project helpers (extended) ─────────────────────────────────
+
+    def create_project(self, values: dict[str, Any]) -> int:
+        """Create a project and return its ID."""
+        return self.create("project.project", values)
+
+    def update_project(self, project_id: int, values: dict[str, Any]) -> bool:
+        """Update a project by ID."""
+        return self.write("project.project", [project_id], values)

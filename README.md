@@ -39,7 +39,7 @@ Add this to your `.cursor/mcp.json` (create it if it doesn't exist):
       "command": "odoo-mcp",
       "env": {
         "ODOO_URL": "https://mycompany.odoo.com",
-        "ODOO_DB": "mycompany-main",
+        "ODOO_DB": "mycompany",
         "ODOO_USERNAME": "admin@mycompany.com",
         "ODOO_API_KEY": "your-api-key-here"
       }
@@ -54,6 +54,11 @@ Add this to your `.cursor/mcp.json` (create it if it doesn't exist):
 >   "command": "/path/to/odoo-mcp/.venv/bin/odoo-mcp"
 > }
 > ```
+>
+> **Important**
+> - `ODOO_URL` should be the site base URL (for example `https://mycompany.odoo.com`)
+> - Do not include `/odoo` in `ODOO_URL`
+> - `ODOO_DB` should be the database name, not a URL
 
 ### 4. Use It
 
@@ -69,17 +74,55 @@ Restart Cursor, then try prompts like:
 |------|-------------|
 | `odoo_test_connection` | Verify credentials and connectivity |
 | `odoo_list_projects` | List all projects with metadata |
+| `odoo_create_project` | Create a project from MCP |
+| `odoo_update_project` | Update project fields like name/manager/active |
 | `odoo_get_project_stages` | Get kanban stages for a project |
 | `odoo_create_task` | Create a single task (supports subtasks via `parent_id`) |
 | `odoo_create_tasks_batch` | Create multiple tasks at once |
 | `odoo_list_tasks` | List tasks in a project |
 | `odoo_update_task` | Update any field on an existing task |
+| `odoo_post_task_message` | Post progress updates to task chatter |
 | `odoo_search_users` | Find users by name/email for assignment |
 | `odoo_list_tags` | List existing project tags |
 | `odoo_create_milestone` | Create project milestones for phasing |
 | `odoo_list_milestones` | List milestones in a project |
 | `odoo_search_records` | Generic search on any Odoo model |
 | `odoo_create_record` | Generic create on any Odoo model |
+| `odoo_update_record` | Generic update for any Odoo model |
+| `odoo_delete_record` | Generic delete for any Odoo model |
+
+## Team Setup
+
+For teammates, there are two common install options:
+
+1. Clone this repo and install locally:
+```bash
+git clone <your-repo-url>
+cd odoo-mcp
+python -m venv .venv
+source .venv/bin/activate
+pip install -e .
+```
+
+2. Install directly from a Git URL:
+```bash
+pip install "git+https://github.com/<org>/<repo>.git#subdirectory=odoo-mcp"
+```
+
+Then each teammate adds an `odoo` block in `~/.cursor/mcp.json`, sets their own
+`ODOO_URL`, `ODOO_DB`, `ODOO_USERNAME`, and `ODOO_API_KEY`, restarts Cursor, and
+runs `odoo_test_connection`.
+
+You can also run a local CLI diagnostic before opening Cursor:
+
+```bash
+set -a
+source .env
+set +a
+odoo-mcp-doctor
+```
+
+See `docs/TEAM_ROLLOUT.md` for a complete teammate onboarding flow.
 
 ## How PRD → Tasks Works
 

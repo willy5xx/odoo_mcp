@@ -107,6 +107,69 @@ def odoo_list_projects(active_only: bool = True) -> str:
 
 
 @mcp.tool()
+def odoo_create_project(
+    name: str,
+    description: str = "",
+    manager_user_id: int | None = None,
+    active: bool = True,
+) -> str:
+    """Create a new Odoo project.
+
+    Args:
+        name: Project name.
+        description: Optional project description.
+        manager_user_id: Optional project manager user ID.
+        active: Whether the project should be active.
+    """
+    vals: dict[str, Any] = {"name": name, "active": active}
+    if description:
+        vals["description"] = description
+    if manager_user_id is not None:
+        vals["user_id"] = manager_user_id
+
+    project_id = get_client().create_project(vals)
+    return _fmt({"id": project_id, "name": name, "active": active})
+
+
+@mcp.tool()
+def odoo_update_project(
+    project_id: int,
+    name: str | None = None,
+    description: str | None = None,
+    manager_user_id: int | None = None,
+    active: bool | None = None,
+) -> str:
+    """Update an existing Odoo project.
+
+    Only provided fields are updated.
+
+    Args:
+        project_id: Project ID to update.
+        name: New project name.
+        description: New project description.
+        manager_user_id: New project manager user ID.
+        active: Archive/unarchive state.
+    """
+    vals: dict[str, Any] = {}
+    if name is not None:
+        vals["name"] = name
+    if description is not None:
+        vals["description"] = description
+    if manager_user_id is not None:
+        vals["user_id"] = manager_user_id
+    if active is not None:
+        vals["active"] = active
+
+    if not vals:
+        return _fmt({"error": "No fields provided to update"})
+
+    get_client().update_project(project_id, vals)
+    return _fmt(
+        {"updated": True, "project_id": project_id, "fields_changed": list(vals.keys())}
+    )
+
+
+@mcp.tool()
 def odoo_get_project_stages(project_id: int) -> str:
     """Get the kanban stages (columns) for a project.
 
@@ -299,6 +362,32 @@ def odoo_update_task(
     return _fmt({"updated": True, "task_id": task_id, "fields_changed": list(vals.keys())})
 
 
+@mcp.tool()
+def odoo_post_task_message(
+    task_id: int,
+    body: str,
+    message_type: str = "comment",
+    subtype_xmlid: str = "mail.mt_comment",
+) -> str:
+    """Post a chatter message on a task.
+
+    Useful for status updates and progress notes without changing task fields.
+
+    Args:
+        task_id: Task ID to post on.
+        body: Message body (HTML supported by Odoo).
+        message_type: Odoo message type, usually 'comment' or 'notification'.
+        subtype_xmlid: Mail subtype XML ID (default 'mail.mt_comment').
+    """
+    message_id = get_client().post_task_message(
+        task_id=task_id,
+        body=body,
+        message_type=message_type,
+        subtype_xmlid=subtype_xmlid,
+    )
+    return _fmt({"posted": True, "task_id": task_id, "message_id": message_id})
+
+
 # ── Users ───────────────────────────────────────────────────────────
 
 
@@ -379,6 +468,39 @@ def odoo_create_record(model: str, values: dict) -> str:
     """
     record_id = get_client().create(model, values)
     return _fmt({"id": record_id, "model": model})
+
+
+@mcp.tool()
+def odoo_update_record(model: str, record_ids: list[int], values: dict) -> str:
+    """Update records in any Odoo model.
+
+    Args:
+        model: Odoo model name (e.g. 'project.task').
+        record_ids: One or more record IDs to update.
+        values: Dict of fields to update.
+    """
+    if not record_ids:
+        return _fmt({"error": "record_ids must not be empty"})
+    if not values:
+        return _fmt({"error": "values must not be empty"})
+
+    updated = get_client().write(model, record_ids, values)
+    return _fmt({"updated": bool(updated), "model": model, "record_ids": record_ids})
+
+
+@mcp.tool()
+def odoo_delete_record(model: str, record_ids: list[int]) -> str:
+    """Delete records from any Odoo model.
+
+    Args:
+        model: Odoo model name.
+        record_ids: One or more IDs to delete.
+    """
+    if not record_ids:
+        return _fmt({"error": "record_ids must not be empty"})
+
+    deleted = get_client().unlink(model, record_ids)
+    return _fmt({"deleted": bool(deleted), "model": model, "record_ids": record_ids})
 
 
 # ── Milestones ──────────────────────────────────────────────────────
